@@ -1,5 +1,7 @@
 # NLP Earnings Signal — FinBERT Return-Predictive Alpha
 
+[![CI](https://github.com/rxj0102/nlp-earnings-signal/actions/workflows/ci.yml/badge.svg)](https://github.com/rxj0102/nlp-earnings-signal/actions/workflows/ci.yml)
+
 A systematic NLP signal that extracts **tone change** from S&P 500 earnings call transcripts using FinBERT, and constructs a long-short equity strategy with documented IC across multiple return horizons.
 
 ---
