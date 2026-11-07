@@ -111,21 +111,42 @@ def hit_rate(rets: pd.Series) -> float:
     return (rets > 0).mean()
 
 
-def deflated_sharpe_ratio(sr: float, n_trials: int, n_obs: int, skew: float = 0.0, kurt: float = 3.0) -> float:
+def deflated_sharpe_ratio(
+    sr: float,
+    n_trials: int,
+    n_obs: int,
+    skew: float = 0.0,
+    kurt: float = 3.0,
+    periods_per_year: float = 12,
+) -> float:
     """
     Bailey & Lopez de Prado (2014) Deflated Sharpe Ratio.
-    Adjusts for multiple testing, autocorrelation, and non-normality.
+
+    ``sr`` is the ANNUALISED Sharpe; ``kurt`` is raw (non-excess) kurtosis.
+    The estimator variance (skew/kurtosis inflation) must use the per-period
+    Sharpe, so ``sr`` is de-annualised internally.  Returns P(true SR > 0)
+    after deflating for the best of ``n_trials`` independent trials.
     """
     if n_obs <= 1:
         return np.nan
-    # Expected maximum Sharpe under multiple testing
-    gamma = np.euler_gamma
-    expected_max_sr = (1 - gamma) * stats.norm.ppf(1 - 1 / n_trials) + gamma * stats.norm.ppf(1 - 1 / (n_trials * np.e))
-    # Correction for skewness and kurtosis
-    sr_star = expected_max_sr * (1 - skew * sr + (kurt - 1) / 4 * sr**2) ** 0.5
-    # Probability that SR > SR*
-    prob = stats.norm.cdf((sr - sr_star) * np.sqrt(n_obs - 1))
-    return prob
+    n_trials = max(int(n_trials), 1)
+    sr_p = sr / np.sqrt(periods_per_year)
+
+    # Expected maximum of n_trials standard-normal Sharpe estimates
+    if n_trials == 1:
+        expected_max = 0.0
+    else:
+        gamma = np.euler_gamma
+        expected_max = (1 - gamma) * stats.norm.ppf(1 - 1 / n_trials) + gamma * stats.norm.ppf(
+            1 - 1 / (n_trials * np.e)
+        )
+
+    # Variance inflation for non-normal returns (per-period SR)
+    infl = max(1 - skew * sr_p + (kurt - 1) / 4 * sr_p**2, 1e-12)
+
+    # z = (SR_hat - SR0) / sd(SR_hat), with SR0 = expected_max * sd(SR_hat)
+    z = sr_p * np.sqrt(n_obs - 1) / np.sqrt(infl) - expected_max
+    return float(stats.norm.cdf(z))
 
 
 def compute_metrics(port: pd.DataFrame, label: str, n_trials: int = 10) -> dict:

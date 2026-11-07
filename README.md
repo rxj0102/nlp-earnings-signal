@@ -131,3 +131,7 @@ python backtest/longshort_backtest.py
 
 ## Dependencies
 See `requirements.txt`. Key packages: `transformers`, `torch`, `yfinance`, `scipy`, `pandas`, `matplotlib`.
+
+## Known limitations
+
+- **Deflated Sharpe fix.** `deflated_sharpe_ratio` previously used the annualised Sharpe inside the skew/kurtosis variance-inflation term and in the z-statistic, mixing units. It now de-annualises first. The Deflated Sharpe values in the results table above were computed before this fix; re-run `backtest/longshort_backtest.py` to refresh them.
