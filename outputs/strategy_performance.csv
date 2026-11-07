@@ -1,0 +1,3 @@
+period,n_months,ann_return,sharpe,max_drawdown,hit_rate,deflated_sharpe,mean_monthly_ret,vol_monthly
+train_2018_2020,11,0.0657,0.729,-0.0509,0.545,0.005,0.0056,0.0268
+test_2021_2023,11,-0.0941,-0.965,-0.1324,0.455,0.0,-0.0078,0.0281
