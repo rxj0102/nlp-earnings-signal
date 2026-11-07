@@ -40,10 +40,14 @@ HORIZONS = [1, 5, 10, 20]
 # Return fetching
 # ---------------------------------------------------------------------------
 
-def fetch_forward_returns(df: pd.DataFrame) -> pd.DataFrame:
+def fetch_forward_returns(df: pd.DataFrame, allow_synthetic: bool = False) -> pd.DataFrame:
     """
     Download price data from yfinance and compute forward returns.
-    Falls back to synthetic returns if yfinance fails.
+
+    If the download fails or comes back empty this raises, unless
+    allow_synthetic=True, in which case returns are SIMULATED with a signal
+    injected by construction (any IC measured on them is circular and says
+    nothing about real predictive power).
     """
     tickers = df["ticker"].unique().tolist()
     dates = df["date"].unique().tolist()
@@ -60,9 +64,16 @@ def fetch_forward_returns(df: pd.DataFrame) -> pd.DataFrame:
         if isinstance(prices, pd.Series):
             prices = prices.to_frame(tickers[0])
         prices.index = pd.to_datetime(prices.index)
+        if prices.dropna(how="all").empty:
+            raise RuntimeError("price download returned no data (rate-limited or offline)")
         return _compute_returns_from_prices(df, prices)
     except Exception as e:
-        print(f"  yfinance failed ({e}); using synthetic returns.")
+        if not allow_synthetic:
+            raise RuntimeError(
+                f"Could not fetch prices ({e}). Re-run later, or pass allow_synthetic=True "
+                "to use simulated returns (demo only; IC is circular)."
+            ) from e
+        print(f"  yfinance failed ({e}); using SIMULATED returns (demo only).")
         return _synthetic_returns(df)
 
 
@@ -216,7 +227,7 @@ def main():
         returns = pd.read_csv(RETURNS_FILE, parse_dates=["date"])
         print(f"Loaded cached forward returns ({len(returns)} rows).")
     else:
-        returns = fetch_forward_returns(scores)
+        returns = fetch_forward_returns(scores, allow_synthetic="--allow-synthetic" in sys.argv)
         returns.to_csv(RETURNS_FILE, index=False)
         print(f"Saved forward returns to {RETURNS_FILE}")
 

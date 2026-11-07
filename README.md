@@ -2,14 +2,14 @@
 
 [![CI](https://github.com/rxj0102/nlp-earnings-signal/actions/workflows/ci.yml/badge.svg)](https://github.com/rxj0102/nlp-earnings-signal/actions/workflows/ci.yml)
 
-A systematic NLP signal that extracts **tone change** from S&P 500 earnings call transcripts using FinBERT, and constructs a long-short equity strategy with documented IC across multiple return horizons.
+A systematic NLP signal that extracts **tone change** from S&P 500 earnings call transcripts using FinBERT, and constructs a long-short equity strategy (pipeline and methodology; see the status section below for what the committed outputs do and do not show).
 
 ---
 
 ## Methodology
 
 ### 1. Data Acquisition
-- **Source:** S&P 500 earnings call transcripts, 2018–2023 (100+ companies, 500+ calls)
+- **Source:** live scrape of Motley Fool transcripts where available, otherwise a synthetic demo dataset (100 tickers x 12 quarters)
 - **Format:** `{ticker, date, quarter, text}` stored as JSON
 - **Scraping:** BeautifulSoup + requests targeting Motley Fool transcripts; falls back to a curated synthetic dataset preserving realistic sentiment autocorrelation
 
@@ -39,40 +39,30 @@ A systematic NLP signal that extracts **tone change** from S&P 500 earnings call
 - **OOS split:** train 2018–2020 | test 2021–2023
 
 ### 5. Integration with Momentum
-- Incremental IC analysis: `tone_change` is residualized on a 12-month momentum proxy
-- Tests whether NLP adds alpha beyond price-based signals
+- Incremental IC analysis: `tone_change` is residualized on a `net_tone`-based proxy (not price momentum; see limitations)
 
 ---
 
-## IC Results
+## Status of results (read this first)
 
-Results below are from running real FinBERT on live earnings call transcripts.  
-The repo ships with a **mock scorer** (word-count heuristic) for fast local testing — run `python run_pipeline.py --real` for authentic FinBERT results.
+The committed outputs in `outputs/` come from the **demo configuration**: synthetic transcripts (`scraper/fetch_transcripts.py` generates 100 tickers x 12 quarters), the word-count mock scorer, and whatever returns were cached at the time. They are **not evidence of predictive power**, and the earlier README tables (IC 0.03-0.08, Sharpe 0.5-1.1) were target ranges, not measured results. They have been removed.
 
-| Signal | Horizon | Mean IC | t-stat | Notes |
-|--------|---------|---------|--------|-------|
-| FinBERT `tone_change` | 1d | 0.03–0.05 | 1.2–1.8 | Short-horizon drift |
-| FinBERT `tone_change` | 5d | 0.05–0.08 | 1.8–2.5 | Peak predictive horizon |
-| FinBERT `tone_change` | 10d | 0.04–0.07 | 1.5–2.2 | Signal decays |
-| FinBERT `tone_change` | 20d | 0.03–0.06 | 1.1–2.0 | Momentum takes over |
-| WordCount baseline | 20d | 0.01–0.03 | 0.4–1.0 | ~50% of FinBERT IC |
+What the committed outputs actually show (mock scorer, ~1,100 observations):
 
-> Exact values written to `outputs/ic_by_horizon.csv` after running the pipeline.  
-> FinBERT consistently adds ~2× IC vs. the word-count baseline by capturing contextual sentiment that simple keyword counts miss.
+| Signal | Horizon | IC | t-stat |
+|--------|---------|----|--------|
+| `tone_change` | 5d | -0.045 | -1.47 |
+| `tone_change` | 20d | -0.019 | -0.60 |
+| word-count baseline | 20d | -0.020 | -0.64 |
 
----
+No horizon is statistically distinguishable from zero, and the 2021-2023 test window of the long-short backtest is negative (about 22 monthly observations in total, far too few to conclude anything).
 
-## Strategy Performance
-
-Results below are from live FinBERT + real price data. Mock-scorer results will differ.
-
-| Period | Ann. Return | Sharpe | Max Drawdown | Hit Rate | Deflated Sharpe |
-|--------|------------|--------|--------------|----------|-----------------|
-| Train 2018–2020 | ~8–12% | 0.7–1.1 | −8% to −12% | 55–60% | >0.5 |
-| Test 2021–2023 | ~5–9% | 0.5–0.9 | −10% to −15% | 52–57% | >0.4 |
-
-> Exact values written to `outputs/strategy_performance.csv` after running the pipeline.  
-> 10 bps one-way transaction cost applied; Deflated Sharpe accounts for multiple-testing bias (Bailey & Lopez de Prado 2014).
+Known limitations:
+- Transcripts are synthetic unless the live Motley Fool scrape succeeds (it needs >= 50 transcripts).
+- Return fetching now **raises** if prices cannot be downloaded. Simulated returns (which inject a signal by construction, so any IC on them is circular) require `--allow-synthetic` / `allow_synthetic=True`.
+- `momentum_proxy` in the incremental-IC step is a rolling mean of `net_tone`, **not price momentum**, so that step does not test incremental value over price momentum.
+- Entry is the close on the call date; calls after the close or before the open make the reaction window imprecise.
+- Genuine results require `python run_pipeline.py --real` on real transcripts (not included) plus a clean price download.
 
 ---
 
@@ -121,19 +111,3 @@ python backtest/longshort_backtest.py
 ```
 
 ---
-
-## Resume Bullets
-
-- **Built an end-to-end NLP alpha signal** using `ProsusAI/finbert` on S&P 500 earnings call transcripts (500+ calls, 100+ companies, 2018–2023), achieving Spearman IC of ~0.06–0.08 at 5–20 day horizons — 2× the IC of a word-count baseline
-- **Engineered `tone_change`** (quarter-over-quarter FinBERT net sentiment delta) as the primary predictive feature; demonstrated monotonic decile return profile and positive incremental IC over price momentum
-- **Backtested a monthly-rebalanced long-short strategy** (top/bottom 3 deciles, 10 bps one-way cost) across 2018–2023 with train/test split; reported annualized return, Sharpe, max drawdown, hit rate, and Deflated Sharpe Ratio per Bailey & Lopez de Prado (2014)
-- **Implemented full ML pipeline** in Python: BeautifulSoup scraping, HuggingFace `transformers` inference, `yfinance` return computation, `scipy` IC testing, and `matplotlib`/`seaborn` visualization
-
----
-
-## Dependencies
-See `requirements.txt`. Key packages: `transformers`, `torch`, `yfinance`, `scipy`, `pandas`, `matplotlib`.
-
-## Known limitations
-
-- **Deflated Sharpe fix.** `deflated_sharpe_ratio` previously used the annualised Sharpe inside the skew/kurtosis variance-inflation term and in the z-statistic, mixing units. It now de-annualises first. The Deflated Sharpe values in the results table above were computed before this fix; re-run `backtest/longshort_backtest.py` to refresh them.
