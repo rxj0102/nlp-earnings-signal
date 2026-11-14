@@ -1,4 +1,4 @@
-# NLP Earnings Signal — FinBERT Return-Predictive Alpha
+# NLP Earnings Signal: FinBERT Return-Predictive Alpha
 
 [![CI](https://github.com/rxj0102/nlp-earnings-signal/actions/workflows/ci.yml/badge.svg)](https://github.com/rxj0102/nlp-earnings-signal/actions/workflows/ci.yml)
 
@@ -13,8 +13,8 @@ A systematic NLP signal that extracts **tone change** from S&P 500 earnings call
 - **Format:** `{ticker, date, quarter, text}` stored as JSON
 - **Scraping:** BeautifulSoup + requests targeting Motley Fool transcripts; falls back to a curated synthetic dataset preserving realistic sentiment autocorrelation
 
-### 2. NLP Pipeline — FinBERT
-- Model: [`ProsusAI/finbert`](https://huggingface.co/ProsusAI/finbert) — domain-adapted BERT trained on financial text
+### 2. NLP Pipeline: FinBERT
+- Model: [`ProsusAI/finbert`](https://huggingface.co/ProsusAI/finbert); domain-adapted BERT trained on financial text
 - Each transcript is split into paragraphs and classified as **positive / negative / neutral**
 - Call-level aggregation:
   ```
@@ -28,7 +28,7 @@ A systematic NLP signal that extracts **tone change** from S&P 500 earnings call
 - Forward returns computed at **1, 5, 10, 20 calendar days** post-earnings
 - **IC (Spearman rank correlation)** measures how well `tone_change` ranks future returns
 - Decile analysis tests monotonicity: top decile should earn the highest returns
-- **Baseline comparison:** simple positive/negative word-count ratio — quantifies FinBERT's incremental value
+- **Baseline comparison:** simple positive/negative word-count ratio; quantifies FinBERT's incremental value
 
 ### 4. Long-Short Backtest
 - **Universe:** ~100 S&P 500 stocks with quarterly earnings coverage
@@ -111,3 +111,27 @@ python backtest/longshort_backtest.py
 ```
 
 ---
+
+## Reproducibility
+
+### Data availability
+
+All inputs come from free, public sources. No paid data or API keys are required unless noted.
+
+- Yahoo Finance via the yfinance package (free, no key)
+
+### Computational requirements
+
+- Python 3.12.3. Every dependency version is pinned in `uv.lock`.
+- Checked on Linux x86_64 with 2 CPU cores and 8 GB RAM. No GPU is needed.
+
+```bash
+pip install uv     # once
+uv sync            # installs the exact pinned environment
+uv run pytest -q   # runs the test suite
+```
+
+### Citation
+
+Citation metadata is in `CITATION.cff`. GitHub turns it into a Cite this repository button on the repo page.
+
